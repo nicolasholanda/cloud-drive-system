@@ -7,6 +7,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
@@ -32,5 +33,10 @@ public class BlockStorageService {
         s3Client.putObject(
                 PutObjectRequest.builder().bucket(bucket).key(storageKey).build(),
                 RequestBody.fromBytes(content));
+    }
+
+    public byte[] downloadBlock(String storageKey) {
+        return s3Client.getObjectAsBytes(
+                GetObjectRequest.builder().bucket(bucket).key(storageKey).build()).asByteArray();
     }
 }
