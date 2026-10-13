@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class FileUploadService {
@@ -55,16 +56,9 @@ public class FileUploadService {
         this.blockHasher = blockHasher;
     }
 
-    public FileUploadResponse upload(String ownerEmail, String fileName, InputStream content) {
+    public FileUploadResponse uploadNewFile(String ownerEmail, String fileName, InputStream content) {
         User owner = userRepository.findByEmail(ownerEmail)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid user"));
-
-        List<byte[]> blocks;
-        try {
-            blocks = blockSplitter.split(content);
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "could not read uploaded file", e);
-        }
 
         Instant now = Instant.now();
 
@@ -76,11 +70,41 @@ public class FileUploadService {
                 .updatedAt(now)
                 .build());
 
+        return uploadVersion(file, 1, content);
+    }
+
+    public FileUploadResponse uploadNewVersion(String requesterEmail, UUID fileId, InputStream content) {
+        FileEntity file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "file not found"));
+
+        if (!file.getOwner().getEmail().equals(requesterEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not allowed to modify this file");
+        }
+
+        int previousVersionNumber = fileVersionRepository.findTopByFileIdOrderByVersionNumberDesc(fileId)
+                .map(FileVersion::getVersionNumber)
+                .orElse(0);
+
+        file.setUpdatedAt(Instant.now());
+        fileRepository.save(file);
+
+        return uploadVersion(file, previousVersionNumber + 1, content);
+    }
+
+    private FileUploadResponse uploadVersion(FileEntity file, int versionNumber, InputStream content) {
+        List<byte[]> blocks;
+        try {
+            blocks = blockSplitter.split(content);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "could not read uploaded file", e);
+        }
+
+        Instant now = Instant.now();
         long totalSizeBytes = blocks.stream().mapToLong(block -> block.length).sum();
 
         FileVersion fileVersion = fileVersionRepository.save(FileVersion.builder()
                 .file(file)
-                .versionNumber(1)
+                .versionNumber(versionNumber)
                 .totalSizeBytes(totalSizeBytes)
                 .createdAt(now)
                 .build());

@@ -39,7 +39,20 @@ public class FileController {
                                                        @RequestParam String name,
                                                        @RequestParam MultipartFile file) {
         try {
-            FileUploadResponse response = fileUploadService.upload(authentication.getName(), name, file.getInputStream());
+            FileUploadResponse response = fileUploadService.uploadNewFile(authentication.getName(), name, file.getInputStream());
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "could not read uploaded file", e);
+        }
+    }
+
+    @PostMapping("/{fileId}/versions")
+    public ResponseEntity<FileUploadResponse> uploadNewVersion(Authentication authentication,
+                                                                 @PathVariable UUID fileId,
+                                                                 @RequestParam MultipartFile file) {
+        try {
+            FileUploadResponse response =
+                    fileUploadService.uploadNewVersion(authentication.getName(), fileId, file.getInputStream());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "could not read uploaded file", e);
